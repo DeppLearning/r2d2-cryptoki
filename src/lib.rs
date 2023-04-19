@@ -8,13 +8,9 @@ use cryptoki::{
     context::Pkcs11,
     error::RvError,
     session::{Session, SessionState, UserType},
-    slot::{Limit, Slot},
+    slot::{Limit, Slot}, types::AuthPin,
 };
 use r2d2::ManageConnection;
-use zeroize::Zeroizing;
-
-/// [Zeroize] wrapper for a PKCS#11 Pin
-pub type Pin = Zeroizing<String>;
 
 /// Alias for this crate's instance of r2d2's Pool
 pub type Pool = r2d2::Pool<SessionManager>;
@@ -29,19 +25,19 @@ pub struct SessionManager {
     session_type: SessionType,
 }
 
-/// Session types, holding the pin for the authenticated sessions
+/// Session types, holding the AuthPin for the authenticated sessions
 #[derive(Debug, Clone)]
 pub enum SessionType {
     /// [SessionState::RoPublic]
     RoPublic,
     /// [SessionState::RoUser]
-    RoUser(Pin),
+    RoUser(AuthPin),
     /// [SessionState::RwPublic]
     RwPublic,
     /// [SessionState::RwUser]
-    RwUser(Pin),
+    RwUser(AuthPin),
     /// [SessionState::RwSecurityOfficer]
-    RwSecurityOfficer(Pin),
+    RwSecurityOfficer(AuthPin),
 }
 
 impl SessionType {
@@ -65,7 +61,7 @@ impl SessionManager {
     ///  pkcs11 .initialize(CInitializeArgs::OsThreads).unwrap();
     ///  let slots = pkcs11.get_slots_with_token().unwrap();
     ///  let slot = slots.first().unwrap();
-    ///  let manager = SessionManager::new(pkcs11, *slot, SessionType::RwUser(Pin::new("abcd".to_string())));
+    ///  let manager = SessionManager::new(pkcs11, *slot, SessionType::RwUser(AuthPin::new("abcd".to_string())));
     /// ```
     pub fn new(pkcs11: Pkcs11, slot: Slot, session_type: SessionType) -> Self {
         Self {
@@ -88,7 +84,7 @@ impl SessionManager {
     ///  # pkcs11.initialize(CInitializeArgs::OsThreads);
     ///  # let slots = pkcs11.get_slots_with_token().unwrap();
     ///  # let slot = slots.first().unwrap();
-    ///  # let manager = SessionManager::new(pkcs11, *slot, SessionType::RwUser(Pin::new("fedcba".to_string())));
+    ///  # let manager = SessionManager::new(pkcs11, *slot, SessionType::RwUser(AuthPin::new("fedcba".to_string())));
     ///  let pool_builder = r2d2::Pool::builder();
     ///  let pool_builder = if let Some(max_size) = manager.max_size(100).unwrap() {
     ///     pool_builder.max_size(max_size)
@@ -140,7 +136,7 @@ impl ManageConnection for SessionManager {
             SessionType::RwSecurityOfficer(pin) => Some((UserType::So, pin)),
         };
         if let Some(user_type) = maybe_user_info {
-            match session.login(user_type.0, Some(user_type.1)) {
+            match session.login(user_type.0, Some(&user_type.1)) {
                 Err(Self::Error::Pkcs11(RvError::UserAlreadyLoggedIn)) => {}
                 res => res?,
             };
@@ -203,6 +199,7 @@ mod test {
 
     #[cached(sync_writes = true)]
     fn default_token(pin: String) -> (Pkcs11, Slot) {
+        let pin = AuthPin::new(pin);
         let pkcs11 = default_pkcs11();
         let slot = {
             let slots = pkcs11
@@ -224,7 +221,7 @@ mod test {
 
     fn default_setup(config: Config) -> Pool {
         let pin_string = "abcde".to_string();
-        let pin = Pin::new(pin_string.clone());
+        let pin = AuthPin::new(pin_string.clone());
         let (pkcs11, slot) = default_token(pin_string);
 
         let manager = SessionManager::new(pkcs11, slot, SessionType::RwUser(pin));
