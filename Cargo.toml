@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/r2d2-cryptoki/"
 documentation = "https://docs.rs/r2d2-cryptoki/"
 
 [dependencies]
-cryptoki = { version = "0.4.1", git = "https://github.com/DeppLearning/rust-cryptoki", rev = "e14e54c447c8cd6abceb688b4424692807a69243", default-features = false  }
+cryptoki = { version = "0.4.1", git = "https://github.com/parallaxsecond/rust-cryptoki", rev = "72673c8cfb2285ab86f485845f1ec439111a8b6a", default-features = false  }
 r2d2 = "0.8.10"
 
 [dev-dependencies]
